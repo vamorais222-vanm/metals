@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Metals Desk</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Metals">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f4f3ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151716" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: control strip on top, a stack of seven metal cards, then one wide evolution chart for the selected metal. */
+:root {
+  --bg: #f4f3ef; --panel: #fbfaf7; --fg: #1d1c1a; --muted: #6b6860; --line: #dedbd2;
+  --accent: #1f4d5c; --accent-fg: #ffffff; --up: #1d7a46; --down: #b3341f; --warn: #8a5a00; --warn-bg: #f6ead0;
+  --grid: #e6e3da;
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #151716; --panel: #1d201f; --fg: #ecebe6; --muted: #9a978d; --line: #32362f;
+    --accent: #7fc3d6; --accent-fg: #0e1a1e; --up: #5fcf8e; --down: #f08a73; --warn: #e5b350; --warn-bg: #2e2813; --grid: #2a2d2a;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--font-sans);
+  padding-top: max(16px, env(safe-area-inset-top, 0px)); padding-bottom: max(40px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.status { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--up); display: inline-block; flex: none; }
+.dot.stale { background: var(--warn); }
+button, select, input { font: inherit; color: inherit; }
+input, select { font-size: 16px; } /* 16px stops iPhone Safari from zooming into fields */
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn { background: var(--accent); color: var(--accent-fg); border: 0; border-radius: 8px; padding: 9px 16px; font-weight: 500; min-height: 40px; }
+.btn[disabled] { opacity: .55; }
+.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.field select, .field input { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; min-width: 0; }
+.notice { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 9px 12px; font-size: 13px; margin-bottom: 6px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
+.card[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.card .top { display: flex; align-items: center; gap: 10px; }
+.sym { width: 44px; height: 44px; border-radius: 8px; display: grid; place-items: center; font: 600 17px var(--font-sans); color: #1a1a1a; position: relative; flex: none; }
+.sym small { position: absolute; top: 2px; left: 4px; font: 400 8px var(--font-mono); opacity: .7; }
+.nm { font-weight: 600; }
+.sub { color: var(--muted); font-size: 12px; }
+.price { font: 500 26px var(--font-mono); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.chg { font: 500 12px var(--font-mono); }
+.chg.up { color: var(--up); } .chg.down { color: var(--down); }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.holding { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end; border-top: 1px solid var(--line); padding-top: 10px; }
+.holding input { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; min-width: 0; font-family: var(--font-mono); }
+.total { text-align: right; font: 500 16px var(--font-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.total .l { display: block; font: 400 11px var(--font-sans); color: var(--muted); }
+.nodata { color: var(--muted); font-size: 13px; padding: 6px 0 2px; }
+.chart-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: center; }
+.chart-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.ranges { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.ranges button { background: transparent; border: 0; padding: 8px 14px; border-right: 1px solid var(--line); }
+.ranges button:last-child { border-right: 0; }
+.ranges button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+.stat .l { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font: 500 15px var(--font-mono); font-variant-numeric: tabular-nums; }
+.plot { position: relative; width: 100%; touch-action: pan-y; }
+.plot svg { display: block; width: 100%; height: auto; }
+.tip { position: absolute; pointer-events: none; background: var(--fg); color: var(--bg); border-radius: 6px; padding: 6px 9px; font: 12px var(--font-mono); white-space: nowrap; transform: translate(-50%, -110%); display: none; z-index: 2; }
+.empty { color: var(--muted); padding: 24px 8px; text-align: center; font-size: 14px; }
+details.settings { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+details.settings summary { cursor: pointer; font-weight: 500; }
+details.settings .inner { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+details.settings p { margin: 0; color: var(--muted); font-size: 13px; }
+footer { color: var(--muted); font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Metals Desk</h1>
+    <div class="status"><span class="dot stale" id="dot"></span><span id="statusText">Loading…</span><button class="btn" id="refreshBtn" type="button">Refresh</button></div>
+  </header>
+
+  <section class="controls" aria-label="Display settings">
+    <div class="field"><label for="currency">Currency</label><select id="currency"></select></div>
+    <div class="field"><label for="unit">Unit of mass</label><select id="unit"></select></div>
+    <div class="field"><label for="premium">Physical premium over spot (%)</label><input id="premium" type="text" inputmode="decimal" value="0" autocomplete="off"></div>
+  </section>
+
+  <div id="notices"></div>
+  <section class="grid" id="cards" aria-label="Metal prices"></section>
+
+  <section class="chart-panel" aria-label="Price evolution">
+    <div class="chart-head">
+      <h2 id="chartTitle">Evolution</h2>
+      <div class="ranges" id="ranges" role="group" aria-label="Time range">
+        <button type="button" data-days="7">7D</button><button type="button" data-days="30">1M</button>
+        <button type="button" data-days="90">3M</button><button type="button" data-days="365">1Y</button>
+      </div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="plot" id="plot"><div class="tip" id="tip"></div></div>
+  </section>
+
+  <details class="settings" id="settings">
+    <summary>Price history settings</summary>
+    <div class="inner">
+      <p>The chart is built from the prices this phone fetches each time you open or refresh the app. For a year of daily history at once, paste a free gold-api.com API key (gold, silver, platinum, palladium). The key is stored only on this phone.</p>
+      <div class="field"><label for="apikey">gold-api.com API key (optional)</label><input id="apikey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+      <button class="btn ghost" id="histBtn" type="button">Download history now</button>
+      <p id="histMsg"></p>
+    </div>
+  </details>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+const UNITS = {
+  toz: { label: "Troy ounce (oz t)", short: "oz t", g: 31.1034768 },
+  g:   { label: "Gram (g)", short: "g", g: 1 },
+  kg:  { label: "Kilogram (kg)", short: "kg", g: 1000 },
+  oz:  { label: "Ounce, avoirdupois (oz)", short: "oz", g: 28.349523125 },
+  lb:  { label: "Pound (lb)", short: "lb", g: 453.59237 },
+};
+const TOZ_G = 31.1034768;
+const META = {
+  XAU: { name: "Gold", chem: "Au", z: 79, live: true }, XAG: { name: "Silver", chem: "Ag", z: 47, live: true },
+  XPT: { name: "Platinum", chem: "Pt", z: 78, live: true }, XPD: { name: "Palladium", chem: "Pd", z: 46, live: true },
+  XRH: { name: "Rhodium", chem: "Rh", z: 45, live: false }, IRD: { name: "Iridium", chem: "Ir", z: 77, live: false },
+  RUTH: { name: "Ruthenium", chem: "Ru", z: 44, live: false },
+};
+const TINT = { XAU: "#d4af37", XAG: "#c7ccd1", XPT: "#b9c4cf", XPD: "#a9b3a8", XRH: "#d9a9a0", IRD: "#9fb0c8", RUTH: "#b7a98f" };
+const ORDER = ["XAU", "XAG", "XPT", "XPD", "XRH", "IRD", "RUTH"];
+const LIVE = ORDER.filter(s => META[s].live);
+const COMMON = ["USD", "EUR", "GBP", "CHF", "JPY", "CAD", "AUD", "CNY", "INR", "BRL"];
+const FALLBACK_FX = ["EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "HKD", "SGD", "SEK", "NOK", "DKK", "NZD", "MXN", "INR", "BRL", "ZAR", "KRW"];
+const GOLD_API = "https://api.gold-api.com";
+const FX_URL = "https://open.er-api.com/v6/latest/USD";
+
+// price of one chosen unit, in the chosen currency, from USD per troy ounce
+function perUnit(usdPerToz, fx, unit) { return usdPerToz * (UNITS[unit].g / TOZ_G) * fx; }
+
+// ---- saved state ------------------------------------------------------------
+const state = loadJSON("metals-desk-prefs", { currency: "EUR", unit: "toz", premium: "0", selected: "XAU", days: 30, qty: {}, key: "" });
+const store = loadJSON("metals-desk-data", { quotes: {}, fx: {}, fxTs: null, fxChecked: 0, history: {}, lastFetch: null, lastBackfill: 0 });
+let data = null, loading = false, errors = [], histMsg = "";
+
+function loadJSON(key, fallback) {
+  try { const v = JSON.parse(localStorage.getItem(key) || "null"); if (v && typeof v === "object") return Object.assign({}, fallback, v); } catch (e) {}
+  return fallback;
+}
+function savePrefs() { try { localStorage.setItem("metals-desk-prefs", JSON.stringify(state)); } catch (e) {} }
+function saveStore() { compact(); try { localStorage.setItem("metals-desk-data", JSON.stringify(store)); } catch (e) {} }
+
+// Keep the saved history small: readings older than 10 days become one point per day, nothing older than 400 days.
+function compact() {
+  const now = Date.now() / 1000;
+  for (const sym of Object.keys(store.history)) {
+    const keep = [], byDay = new Map();
+    for (const p of store.history[sym]) {
+      if (p.t < now - 400 * 86400) continue;
+      if (p.live && p.t < now - 10 * 86400) {
+        const k = Math.floor(p.t / 86400), b = byDay.get(k) || { s: 0, n: 0 };
+        b.s += p.usd; b.n++; byDay.set(k, b);
+      } else keep.push(p);
+    }
+    for (const [k, b] of byDay) keep.push({ t: k * 86400 + 43200, usd: b.s / b.n, live: true });
+    keep.sort((a, b) => a.t - b.t);
+    store.history[sym] = keep;
+  }
+}
+
+const $ = (id) => document.getElementById(id);
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function num(s) { const v = parseFloat(String(s).replace(",", ".")); return isFinite(v) ? v : NaN; }
+function money(v, digits) {
+  if (!isFinite(v)) return "—";
+  const d = digits !== undefined ? digits : (Math.abs(v) >= 100 ? 2 : 3);
+  try { return new Intl.NumberFormat(undefined, { style: "currency", currency: activeCurrency(), minimumFractionDigits: d, maximumFractionDigits: d }).format(v); }
+  catch (e) { return v.toFixed(d) + " " + activeCurrency(); }
+}
+function ago(sec) {
+  if (sec < 90) return "just now";
+  if (sec < 5400) return Math.round(sec / 60) + " min ago";
+  if (sec < 172800) return Math.round(sec / 3600) + " h ago";
+  return Math.round(sec / 86400) + " days ago";
+}
+function activeCurrency() { return store.fx[state.currency] ? state.currency : "USD"; }
+function fxRate() { return store.fx[activeCurrency()] || 1; }
+
+// ---- fetching ---------------------------------------------------------------
+async function getJSON(url, headers) {
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const r = await fetch(url, { cache: "no-store", headers: headers || {}, signal: ctl.signal });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return await r.json();
+  } finally { clearTimeout(timer); }
+}
+
+function addPoint(sym, t, usd) {
+  const pts = store.history[sym] || (store.history[sym] = []);
+  for (let i = pts.length - 1; i >= 0; i--) {
+    if (pts[i].live) { if (t - pts[i].t < 300) return; break; }
+  }
+  pts.push({ t, usd, live: true });
+}
+
+async function refreshFX(now) {
+  if (store.fxTs && now - store.fxChecked < 3 * 3600) return;
+  try {
+    const j = await getJSON(FX_URL);
+    if (!j || !j.rates) throw new Error("no rates");
+    store.fx = Object.assign({}, j.rates, { USD: 1 }); store.fxTs = j.time_last_update_unix || now; store.fxChecked = now;
+    return;
+  } catch (e) {}
+  // Fallback: gold-api.com returns the exchange rate with every price.
+  const res = await Promise.allSettled(FALLBACK_FX.map(c => getJSON(GOLD_API + "/price/XAU/" + c)));
+  const fx = { USD: 1 }; let got = 0;
+  res.forEach((r, i) => { if (r.status === "fulfilled" && r.value && r.value.exchangeRate) { fx[FALLBACK_FX[i]] = r.value.exchangeRate; got++; } });
+  if (got) { store.fx = fx; store.fxTs = now; store.fxChecked = now; } else errors.push("currency rates");
+}
+
+async function refreshPrices() {
+  if (loading) return;
+  loading = true; errors = []; render();
+  const now = Date.now() / 1000;
+  const res = await Promise.allSettled(LIVE.map(s => getJSON(GOLD_API + "/price/" + s)));
+  let ok = 0;
+  res.forEach((r, i) => {
+    const s = LIVE[i];
+    if (r.status === "fulfilled" && r.value && typeof r.value.price === "number") {
+      ok++;
+      const quoted = r.value.updatedAt ? Date.parse(r.value.updatedAt) / 1000 : now;
+      store.quotes[s] = { usd: r.value.price, ts: isFinite(quoted) ? quoted : now };
+      addPoint(s, now, r.value.price);
+    } else errors.push(META[s].name);
+  });
+  await refreshFX(now);
+  if (ok) store.lastFetch = now;
+  if (state.key && now - (store.lastBackfill || 0) > 86400) await backfillHistory(false);
+  saveStore();
+  loading = false;
+  buildSelectors(); render();
+}
+
+async function backfillHistory(force) {
+  if (!state.key) { histMsg = "Paste a gold-api.com key first."; render(); return; }
+  histMsg = "Downloading history…"; render();
+  const now = Math.floor(Date.now() / 1000); let got = 0, failed = 0;
+  for (const sym of LIVE) {
+    try {
+      const qs = new URLSearchParams({ symbol: sym, startTimestamp: now - 400 * 86400, endTimestamp: now, groupBy: "day", aggregation: "avg", orderBy: "asc" });
+      const rows = await getJSON(GOLD_API + "/history?" + qs, { "x-api-key": state.key.trim() });
+      const pts = [];
+      for (const row of rows) {
+        const day = row.day, pk = Object.keys(row).find(k => k.endsWith("_price"));
+        if (!day || !pk) continue;
+        const t = Date.parse(String(day).slice(0, 10) + "T12:00:00Z") / 1000, v = Number(row[pk]);
+        if (isFinite(t) && isFinite(v)) pts.push({ t, usd: v, live: false });
+      }
+      if (pts.length) {
+        store.history[sym] = (store.history[sym] || []).filter(p => p.live).concat(pts).sort((a, b) => a.t - b.t);
+        got++;
+      } else failed++;
+    } catch (e) { failed++; }
+  }
+  if (got) store.lastBackfill = Date.now() / 1000;
+  histMsg = got ? "History loaded for " + got + " metal" + (got === 1 ? "" : "s") + (failed ? ", " + failed + " failed." : ".")
+    : "History download failed. Check the key (free keys allow 10 requests per hour). Some browsers also block this request.";
+  saveStore(); render();
+}
+
+// ---- derived data -----------------------------------------------------------
+function allPoints(sym) { return (store.history[sym] || []).slice().sort((a, b) => a.t - b.t); }
+function buildData() {
+  const metals = {};
+  for (const sym of ORDER) {
+    const m = META[sym], cur = store.quotes[sym], e = { name: m.name, chem: m.chem, z: m.z, live: m.live };
+    if (cur) {
+      e.usd = cur.usd; e.ts = cur.ts;
+      let prev = null; for (const p of allPoints(sym)) if (p.t <= cur.ts - 24 * 3600) prev = p;
+      if (prev) e.prev_usd = prev.usd;
+    }
+    metals[sym] = e;
+  }
+  data = { metals, fx: Object.assign({ USD: 1 }, store.fx), now: Date.now() / 1000 };
+}
+
+function buildSelectors() {
+  const cur = $("currency"), codes = Object.keys(Object.assign({ USD: 1 }, store.fx)).sort();
+  if (cur.dataset.n === String(codes.length)) return;
+  const common = COMMON.filter(c => codes.includes(c)), rest = codes.filter(c => !common.includes(c));
+  const names = (typeof Intl !== "undefined" && Intl.DisplayNames) ? new Intl.DisplayNames(undefined, { type: "currency" }) : null;
+  const opt = c => { let n = ""; try { n = names ? names.of(c) : ""; } catch (e) {} return `<option value="${c}">${c}${n && n !== c ? " – " + esc(n) : ""}</option>`; };
+  cur.innerHTML = `<optgroup label="Common">${common.map(opt).join("")}</optgroup><optgroup label="All currencies">${rest.map(opt).join("")}</optgroup>`;
+  cur.dataset.n = String(codes.length);
+  cur.value = codes.includes(state.currency) ? state.currency : "USD";
+}
+
+// ---- render -----------------------------------------------------------------
+function render() {
+  buildData();
+  const unit = state.unit, p0 = num(state.premium), prem = 1 + (isFinite(p0) ? p0 : 0) / 100, fx = fxRate();
+  const now = data.now, hasQuotes = ORDER.some(s => data.metals[s].usd);
+  $("refreshBtn").disabled = loading; $("refreshBtn").textContent = loading ? "Fetching…" : "Refresh";
+  $("histMsg").textContent = histMsg;
+
+  const notes = errors.length ? ["Could not update " + errors.join(", ") + ". Check your internet connection (Wi-Fi or mobile data)." + (hasQuotes ? " Showing the last saved prices." : "")] : [];
+  const times = ORDER.map(s => data.metals[s].ts).filter(Boolean), newest = times.length ? Math.max(...times) : null;
+  $("dot").className = "dot" + (errors.length || !store.lastFetch ? " stale" : "");
+  $("statusText").textContent = loading ? "Fetching prices…" : store.lastFetch ? "Fetched " + ago(now - store.lastFetch) : "No prices yet";
+
+  if (newest && now - newest > 3 * 3600) notes.push("The newest quote is " + ago(now - newest) + ". Gold and silver markets close at weekends.");
+  else {
+    const old = ORDER.filter(s => data.metals[s].usd && now - data.metals[s].ts > 6 * 3600).map(s => data.metals[s].name + " (" + ago(now - data.metals[s].ts) + ")");
+    if (old.length) notes.push("The price source has not refreshed " + old.join(", ") + ". Those cards show its last quote.");
+  }
+  if (state.currency !== activeCurrency()) notes.push("Rates for " + state.currency + " are not loaded yet, so prices show in US dollars.");
+  $("notices").innerHTML = notes.map(n => `<div class="notice" role="status">${esc(n)}</div>`).join("");
+
+  const ae = document.activeElement;
+  const keep = ae && ae.dataset && ae.dataset.qty ? { id: ae.id, s: ae.selectionStart, e: ae.selectionEnd } : null;
+  $("cards").innerHTML = ORDER.map(sym => {
+    const m = data.metals[sym], tint = TINT[sym];
+    const head = `<div class="top"><div class="sym" style="background:${tint}"><small>${m.z}</small>${m.chem}</div><div><div class="nm">${m.name}</div><div class="sub">${sym} · per ${UNITS[unit].short}</div></div></div>`;
+    if (!m.usd) {
+      const msg = !m.live ? "No free live price feed exists for this metal, so it is not included yet." : loading ? "Fetching…" : "No quote yet. Tap Refresh.";
+      return `<button class="card" type="button" data-sym="${sym}" aria-pressed="${state.selected === sym}">${head}<div class="nodata">${msg}</div></button>`;
+    }
+    const p = perUnit(m.usd, fx, unit) * prem;
+    let chg = "";
+    if (m.prev_usd) { const c = (m.usd / m.prev_usd - 1) * 100; chg = `<span class="chg ${c >= 0 ? "up" : "down"}">${c >= 0 ? "▲" : "▼"} ${Math.abs(c).toFixed(2)}% 24h</span>`; }
+    const q = state.qty[sym] === undefined ? "" : state.qty[sym], qn = num(q);
+    return `<div class="card" role="button" tabindex="0" data-sym="${sym}" aria-pressed="${state.selected === sym}">
+      ${head}
+      <div class="row"><div class="price">${money(p)}</div>${chg}</div>
+      <div class="sub">Spot ${money(perUnit(m.usd, fx, unit))} · quoted ${ago(now - m.ts)}</div>
+      <div class="holding">
+        <div class="field"><label for="q-${sym}">Mass (${UNITS[unit].short})</label><input id="q-${sym}" data-qty="${sym}" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="${esc(q)}"></div>
+        <div class="total"><span class="l">Total value</span>${isFinite(qn) ? money(qn * p, 2) : "—"}</div>
+      </div></div>`;
+  }).join("");
+  if (keep) { const el = $(keep.id); if (el) { el.focus(); try { el.setSelectionRange(keep.s, keep.e); } catch (e) {} } }
+
+  $("foot").innerHTML = `<div>Spot prices per troy ounce (31.1035 g) converted to the chosen unit and currency${prem !== 1 ? ", plus your premium" : ""}. Physical bars and coins usually sell above spot, so use the premium field to match a dealer quote.</div>
+  <div>Sources: gold-api.com for the metals, open.er-api.com for currency rates${store.fxTs ? " (rates from " + new Date(store.fxTs * 1000).toLocaleDateString() + ")" : ""}. Prices are fetched when you open the app and when you tap Refresh. The chart converts past prices at today's currency rate.</div>`;
+  drawChart();
+}
+
+// ---- chart ------------------------------------------------------------------
+function series(sym, nd) {
+  const cutoff = Date.now() / 1000 - nd * 86400, pts = allPoints(sym).filter(p => p.t >= cutoff);
+  if (nd <= 10) { const live = pts.filter(p => p.live); return live.length >= 3 ? live : pts; }
+  const by = new Map();
+  for (const p of pts) { const k = Math.floor(p.t / 86400), b = by.get(k) || { live: [], hist: [] }; (p.live ? b.live : b.hist).push(p.usd); by.set(k, b); }
+  return [...by.entries()].sort((a, b) => a[0] - b[0]).map(([k, b]) => { const v = b.live.length ? b.live : b.hist; return { t: k * 86400 + 43200, usd: v.reduce((a, c) => a + c, 0) / v.length }; });
+}
+function niceTicks(lo, hi, n) {
+  const span = hi - lo || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(k => k * mag).find(s => s >= raw) || raw;
+  const out = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(v);
+  return out;
+}
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+function drawChart() {
+  document.querySelectorAll("#ranges button").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.days) === state.days)));
+  const plot = $("plot"), tip = $("tip"), sym = state.selected, m = data.metals[sym];
+  $("chartTitle").textContent = m.name + " · evolution";
+  const fx = fxRate(), unit = state.unit;
+  const pts = series(sym, state.days).map(p => ({ t: p.t * 1000, v: perUnit(p.usd, fx, unit) }));
+  if (pts.length < 3) {
+    $("stats").innerHTML = "";
+    plot.innerHTML = `<div class="empty">${m.live ? `Only ${pts.length} reading${pts.length === 1 ? "" : "s"} stored for this period. The app saves a reading each time it fetches prices, so the line fills in as you use it. Add a free gold-api.com key under Price history settings to download about a year of daily history at once.` : "No price data for this metal."}</div>`;
+    plot.appendChild(tip); return;
+  }
+  const W = Math.max(300, plot.clientWidth), H = Math.round(Math.min(360, Math.max(230, W * 0.6)));
+  const pad = { l: 58, r: 12, t: 12, b: 28 };
+  const tmin = pts[0].t, tmax = pts[pts.length - 1].t;
+  let vmin = Math.min(...pts.map(p => p.v)), vmax = Math.max(...pts.map(p => p.v));
+  const padv = (vmax - vmin) * 0.08 || vmax * 0.01; vmin -= padv; vmax += padv;
+  const x = t => pad.l + (t - tmin) / (tmax - tmin || 1) * (W - pad.l - pad.r);
+  const y = v => pad.t + (1 - (v - vmin) / (vmax - vmin)) * (H - pad.t - pad.b);
+  const grid = cssVar("--grid"), muted = cssVar("--muted"), accent = cssVar("--accent"), mono = "IBM Plex Mono, monospace";
+  let g = "";
+  niceTicks(vmin, vmax, 4).forEach(v => {
+    g += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y(v)}" y2="${y(v)}" stroke="${grid}" stroke-width="1"/>`;
+    g += `<text x="${pad.l - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="${muted}" font-family="${mono}">${v >= 1000 ? Math.round(v).toLocaleString() : v.toFixed(v >= 100 ? 1 : 2)}</text>`;
+  });
+  const nx = W < 520 ? 3 : 5, hourly = state.days <= 10;
+  for (let i = 0; i < nx; i++) {
+    const t = tmin + (tmax - tmin) * i / (nx - 1), d = new Date(t);
+    const label = d.toLocaleDateString(undefined, { day: "numeric", month: "short" }) + (hourly ? " " + String(d.getHours()).padStart(2, "0") + "h" : "");
+    g += `<text x="${x(t)}" y="${H - 8}" text-anchor="${i === 0 ? "start" : i === nx - 1 ? "end" : "middle"}" font-size="11" fill="${muted}" font-family="${mono}">${label}</text>`;
+  }
+  const line = pts.map((p, i) => (i ? "L" : "M") + x(p.t).toFixed(1) + " " + y(p.v).toFixed(1)).join(" ");
+  const area = line + ` L${x(tmax).toFixed(1)} ${H - pad.b} L${x(tmin).toFixed(1)} ${H - pad.b} Z`;
+  const last = pts[pts.length - 1];
+  plot.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(m.name)} price over the selected period">
+    ${g}<path d="${area}" fill="${accent}" opacity="0.10"/><path d="${line}" fill="none" stroke="${accent}" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="${x(last.t)}" cy="${y(last.v)}" r="4" fill="${accent}"/><line id="vline" y1="${pad.t}" y2="${H - pad.b}" stroke="${muted}" stroke-dasharray="3 3" style="display:none"/><circle id="vdot" r="4" fill="${cssVar("--bg")}" stroke="${accent}" stroke-width="2" style="display:none"/></svg>`;
+  plot.appendChild(tip);
+
+  const first = pts[0], hi = Math.max(...pts.map(p => p.v)), lo = Math.min(...pts.map(p => p.v)), c = (last.v / first.v - 1) * 100;
+  const st = [["Latest", money(last.v)], ["Change", `<span class="chg ${c >= 0 ? "up" : "down"}">${c >= 0 ? "▲" : "▼"} ${Math.abs(c).toFixed(2)}%</span>`], ["High", money(hi)], ["Low", money(lo)], ["Points", String(pts.length)]];
+  $("stats").innerHTML = st.map(([l, v]) => `<div class="stat"><div class="l">${l}</div><div class="v">${v}</div></div>`).join("");
+
+  const svg = plot.querySelector("svg"), vline = svg.querySelector("#vline"), vdot = svg.querySelector("#vdot");
+  const move = ev => {
+    const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) / r.width * W;
+    const t = tmin + (px - pad.l) / (W - pad.l - pad.r) * (tmax - tmin);
+    let best = pts[0]; for (const p of pts) if (Math.abs(p.t - t) < Math.abs(best.t - t)) best = p;
+    vline.setAttribute("x1", x(best.t)); vline.setAttribute("x2", x(best.t)); vline.style.display = "";
+    vdot.setAttribute("cx", x(best.t)); vdot.setAttribute("cy", y(best.v)); vdot.style.display = "";
+    tip.textContent = new Date(best.t).toLocaleString(undefined, hourly ? { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" } : { day: "numeric", month: "short", year: "numeric" }) + "  " + money(best.v);
+    tip.style.display = "block";
+    tip.style.left = Math.min(Math.max(x(best.t) / W * r.width, 80), r.width - 80) + "px"; tip.style.top = (y(best.v) / H * r.height) + "px";
+  };
+  svg.addEventListener("pointermove", move); svg.addEventListener("pointerdown", move);
+  svg.addEventListener("pointerleave", () => { tip.style.display = "none"; vline.style.display = "none"; vdot.style.display = "none"; });
+}
+
+// ---- events -----------------------------------------------------------------
+function fillStatic() {
+  $("unit").innerHTML = Object.entries(UNITS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join("");
+  $("unit").value = state.unit; $("premium").value = state.premium; $("apikey").value = state.key || "";
+}
+$("currency").addEventListener("change", e => { state.currency = e.target.value; savePrefs(); render(); });
+$("unit").addEventListener("change", e => { state.unit = e.target.value; savePrefs(); render(); });
+$("premium").addEventListener("input", e => { state.premium = e.target.value; savePrefs(); render(); });
+$("apikey").addEventListener("change", e => { state.key = e.target.value.trim(); savePrefs(); });
+$("histBtn").addEventListener("click", () => { state.key = $("apikey").value.trim(); savePrefs(); backfillHistory(true); });
+$("refreshBtn").addEventListener("click", refreshPrices);
+$("ranges").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; state.days = Number(b.dataset.days); savePrefs(); render(); });
+$("cards").addEventListener("input", e => {
+  const s = e.target.dataset && e.target.dataset.qty; if (!s) return;
+  state.qty[s] = e.target.value; savePrefs();
+  const m = data.metals[s], p0 = num(state.premium), p = perUnit(m.usd, fxRate(), state.unit) * (1 + (isFinite(p0) ? p0 : 0) / 100), qn = num(e.target.value);
+  e.target.closest(".card").querySelector(".total").innerHTML = `<span class="l">Total value</span>${isFinite(qn) ? money(qn * p, 2) : "—"}`;
+});
+function pick(e) {
+  if (e.target.closest("input")) return;
+  const c = e.target.closest(".card"); if (!c) return;
+  state.selected = c.dataset.sym; savePrefs(); render();
+}
+$("cards").addEventListener("click", pick);
+$("cards").addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("card")) { e.preventDefault(); pick(e); } });
+window.addEventListener("resize", () => { if (data) drawChart(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && (!store.lastFetch || Date.now() / 1000 - store.lastFetch > 120)) refreshPrices();
+});
+
+if ("serviceWorker" in navigator) { window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); }); }
+
+fillStatic();
+buildSelectors();
+render();
+refreshPrices();
+setInterval(() => { if (!loading) render(); }, 60 * 1000);
+</script>
+</body>
+</html>
